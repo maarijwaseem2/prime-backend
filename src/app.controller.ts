@@ -36,21 +36,34 @@ export class AppController {
   serveFile(@Param('path') path: string, @Res() res: express.Response) {
     try {
       const decodedPath = decodeURIComponent(path);
-      const cleanPath =
-        (decodedPath.includes('://')
-          ? decodedPath.split('/').pop()
-          : decodedPath) || '';
+      // Extract just the filename in case the frontend requested a nested path
+      const filename = decodedPath.split('/').pop() || '';
 
-      if (!cleanPath) {
+      if (!filename) {
         return res.status(400).json({ message: 'Invalid file path' });
       }
 
-      const filePath = resolve(UPLOADS_DIR, cleanPath);
-      if (!existsSync(filePath)) {
-        return res.status(404).json({ message: 'File not found' });
+      // Logic: Search in multiple possible locations
+      const possiblePaths = [
+        // 1. Direct path as requested
+        { rel: decodedPath, abs: resolve(UPLOADS_DIR, decodedPath) },
+        // 2. In categories subfolder
+        {
+          rel: join('categories', filename),
+          abs: resolve(UPLOADS_DIR, 'categories', filename),
+        },
+        // 3. In root uploads folder
+        { rel: filename, abs: resolve(UPLOADS_DIR, filename) },
+      ];
+
+      for (const p of possiblePaths) {
+        if (existsSync(p.abs)) {
+          return res.sendFile(p.rel, { root: UPLOADS_DIR });
+        }
       }
 
-      return res.sendFile(cleanPath, { root: UPLOADS_DIR });
+      console.warn(`[Image 404] File not found: ${decodedPath}`);
+      return res.status(404).json({ message: 'File not found' });
     } catch (error) {
       console.error('[Image 500] Error serving file:', error);
       return res.status(500).json({
@@ -85,10 +98,11 @@ export class AppController {
       throw new NotFoundException('No file uploaded');
     }
 
+    const relativePath = `products/${file.filename}`;
     const appUrl = process.env.APP_URL || 'http://localhost:3001';
     return {
-      filename: file.filename,
-      url: `${appUrl}/uploads/${file.filename}`,
+      filename: relativePath,
+      url: `${appUrl}/uploads/${relativePath}`,
     };
   }
 }

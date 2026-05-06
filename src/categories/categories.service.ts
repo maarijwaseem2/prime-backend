@@ -23,8 +23,22 @@ export class CategoriesService {
     return this.categoriesRepository.save(category);
   }
 
-  findAll() {
-    return this.categoriesRepository.find();
+  async findAll(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await this.categoriesRepository.findAndCount({
+      take: limit,
+      skip: skip,
+      order: { id: 'DESC' },
+    });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: number) {
