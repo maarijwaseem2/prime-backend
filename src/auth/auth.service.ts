@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 
@@ -12,6 +13,7 @@ export class AuthService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async validateUser(loginDto: LoginDto): Promise<any> {
@@ -28,16 +30,71 @@ export class AuthService {
     throw new UnauthorizedException('Invalid credentials');
   }
 
+  async getTokens(userId: number, email: string) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(
+        { sub: userId, email },
+        {
+          secret: this.configService.get<string>('JWT_SECRET'),
+          expiresIn: '15m',
+        },
+      ),
+      this.jwtService.signAsync(
+        { sub: userId, email },
+        {
+          secret:
+            this.configService.get<string>('JWT_REFRESH_SECRET') ||
+            this.configService.get<string>('JWT_SECRET'),
+          expiresIn: '7d',
+        },
+      ),
+    ]);
+    return { access_token: accessToken, refresh_token: refreshToken };
+  }
+
+  async setCurrentRefreshToken(refreshToken: string, userId: number) {
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await this.usersRepository.update(userId, { hashedRefreshToken });
+  }
+
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id };
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.setCurrentRefreshToken(tokens.refresh_token, user.id);
     return {
-      access_token: this.jwtService.sign(payload),
+      ...tokens,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
       },
     };
+  }
+
+  async getUserIfRefreshTokenMatches(refreshToken: string, userId: number) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'name', 'email', 'hashedRefreshToken'],
+    });
+
+    if (!user || !user.hashedRefreshToken) {
+      throw new UnauthorizedException();
+    }
+
+    const isRefreshTokenMatching = await bcrypt.compare(
+      refreshToken,
+      user.hashedRefreshToken,
+    );
+
+    if (isRefreshTokenMatching) {
+      return user;
+    }
+    throw new UnauthorizedException();
+  }
+
+  async removeRefreshToken(userId: number) {
+    return this.usersRepository.update(userId, {
+      hashedRefreshToken: null,
+    });
   }
 
   // Temporary method to create the first admin user

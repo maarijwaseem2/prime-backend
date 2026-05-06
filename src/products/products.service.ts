@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Like } from 'typeorm';
+import { Repository, In, Like, DataSource } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { Category } from '../entities/category.entity';
 import { CategoryProduct } from '../entities/category-product.entity';
@@ -16,6 +16,7 @@ export class ProductsService {
     private categoriesRepository: Repository<Category>,
     @InjectRepository(CategoryProduct)
     private categoryProductRepository: Repository<CategoryProduct>,
+    private dataSource: DataSource,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -28,19 +29,30 @@ export class ProductsService {
         .replace(/[^\w-]+/g, '');
     }
 
-    const product = await this.productsRepository.save(
-      this.productsRepository.create(rest),
-    );
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (categoryIds && categoryIds.length > 0) {
-      const records = categoryIds.map((cid) => ({
-        product_id: product.id,
-        category_id: cid,
-      }));
-      await this.categoryProductRepository.insert(records);
+    try {
+      const productToSave = this.productsRepository.create(rest);
+      const product = await queryRunner.manager.save(Product, productToSave);
+
+      if (categoryIds && categoryIds.length > 0) {
+        const records = categoryIds.map((cid) => ({
+          product_id: product.id,
+          category_id: cid,
+        }));
+        await queryRunner.manager.insert(CategoryProduct, records);
+      }
+
+      await queryRunner.commitTransaction();
+      return product;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    return product;
   }
 
   async findAll(page: number = 1, limit: number = 12) {
@@ -101,17 +113,30 @@ export class ProductsService {
 
     Object.assign(product, rest);
 
-    await this.productsRepository.save(product);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (categoryIds) {
-      await this.categoryProductRepository.delete({ product_id: id });
-      if (categoryIds.length > 0) {
-        const records = categoryIds.map((cid) => ({
-          product_id: id,
-          category_id: cid,
-        }));
-        await this.categoryProductRepository.insert(records);
+    try {
+      await queryRunner.manager.save(Product, product);
+
+      if (categoryIds) {
+        await queryRunner.manager.delete(CategoryProduct, { product_id: id });
+        if (categoryIds.length > 0) {
+          const records = categoryIds.map((cid) => ({
+            product_id: id,
+            category_id: cid,
+          }));
+          await queryRunner.manager.insert(CategoryProduct, records);
+        }
       }
+
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
 
     return this.findOne(id);

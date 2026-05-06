@@ -1,0 +1,200 @@
+{
+  "info": {
+    "_postman_id": "12345-abcde-67890",
+    "name": "Prime Project - Postman APIs Collection",
+    "description": "This collection contains the API endpoints for testing the backend of the Prime Project using Postman or Insomnia."
+  },
+  "item": [
+    {
+      "name": "Authentication Endpoints",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@prime.com\",\n  \"password\": \"adminpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"access_token\": \"...\", \"refresh_token\": \"...\", \"user\": { ... } }"
+            }
+          ]
+        },
+        {
+          "name": "Rotate Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <Access Token>",
+                "description": "Include the access token in the header"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"<Your Refresh Token>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"access_token\": \"...\", \"refresh_token\": \"...\" }"
+            }
+          ]
+        },
+        {
+          "name": "Logout / Revoke Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <Access Token>",
+                "description": "Include the access token in the header"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"message\": \"Logged out successfully\" }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product Endpoints",
+      "item": [
+        {
+          "name": "Fetch All Products (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "12"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"data\": [ ... ], \"meta\": { \"total\": ... } }"
+            }
+          ]
+        },
+        {
+          "name": "Create Product (Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <Access Token>",
+                "description": "Include the admin access token in the header"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"New Instrument\",\n  \"short_description\": \"...\",\n  \"description\": \"...\",\n  \"image_path\": \"...\",\n  \"categoryIds\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            }
+          },
+          "response": [
+            {
+              "status": "201 Created",
+              "body": "{ \"id\": 123, \"title\": \"New Instrument\", ... }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contact & Quote Endpoints",
+      "item": [
+        {
+          "name": "Submit Contact Form (Public)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@doe.com\",\n  \"phone\": \"123456789\",\n  \"subject\": \"Inquiry\",\n  \"message\": \"Hello!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts"]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"message\": \"Inquiry submitted successfully\" }"
+            }
+          ]
+        },
+        {
+          "name": "Fetch All Inquiries (Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <Access Token>",
+                "description": "Include the admin access token in the header"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts"]
+            }
+          },
+          "response": [
+            {
+              "status": "200 OK",
+              "body": "{ \"data\": [ ... ], \"meta\": { \"total\": ... } }"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

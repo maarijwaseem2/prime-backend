@@ -28,6 +28,9 @@ export class User {
   @Column({ name: 'remember_token', nullable: true })
   remember_token: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  hashedRefreshToken: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
